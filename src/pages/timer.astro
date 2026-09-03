@@ -32,12 +32,24 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 					<label for="set-count">セット数</label>
 					<input type="number" id="set-count" min="1" max="30" step="1" value="8" />
 				</div>
+				<div class="field">
+					<label for="height-cm">身長（cm）</label>
+					<input type="number" id="height-cm" min="100" max="250" step="0.1" placeholder="160" />
+				</div>
+				<div class="field">
+					<label for="weight-kg">体重（kg）</label>
+					<input type="number" id="weight-kg" min="20" max="300" step="0.1" placeholder="55" />
+				</div>
 			</section>
+			<p class="calorie-note">
+				消費カロリーは体重をもとにMETs法（運動中 約3.5METs、休憩中 約1.3METs）で概算しています。実際の消費量とは誤差があります。
+			</p>
 
 			<section class="timer" aria-live="polite">
 				<p class="phase" id="phase">スタートを押して開始</p>
 				<p class="time" id="time">00:30</p>
 				<p class="set-count" id="set-progress">0 / 8 セット</p>
+				<p class="calories" id="calories">消費カロリー: 体重を入力してください</p>
 			</section>
 
 			<section class="controls">
@@ -102,6 +114,16 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 		margin: 0;
 		color: rgb(var(--gray-dark));
 	}
+	.calories {
+		margin: 0.6em 0 0 0;
+		font-size: 1.1em;
+		font-weight: bold;
+	}
+	.calorie-note {
+		font-size: 0.8em;
+		color: rgb(var(--gray));
+		margin: -1em 0 1.5em 0;
+	}
 	.controls {
 		display: flex;
 		gap: 1em;
@@ -130,11 +152,14 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 	const bounceInput = document.getElementById('bounce-seconds') as HTMLInputElement;
 	const restInput = document.getElementById('rest-seconds') as HTMLInputElement;
 	const setInput = document.getElementById('set-count') as HTMLInputElement;
+	const heightInput = document.getElementById('height-cm') as HTMLInputElement;
+	const weightInput = document.getElementById('weight-kg') as HTMLInputElement;
 
 	const timerSection = document.querySelector('.timer') as HTMLElement;
 	const phaseEl = document.getElementById('phase') as HTMLElement;
 	const timeEl = document.getElementById('time') as HTMLElement;
 	const setProgressEl = document.getElementById('set-progress') as HTMLElement;
+	const caloriesEl = document.getElementById('calories') as HTMLElement;
 
 	const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
 	const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement;
@@ -142,14 +167,60 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 
 	type Phase = 'idle' | 'bounce' | 'rest' | 'done';
 
+	// METs (運動強度の目安): トランポリンでゆっくり弾む運動 / 休憩中の起立
+	const BOUNCE_MET = 3.5;
+	const REST_MET = 1.3;
+
 	let phase: Phase = 'idle';
 	let currentSet = 0;
 	let secondsLeft = 0;
 	let intervalId: number | undefined;
 	let audioCtx: AudioContext | undefined;
+	let caloriesBurned = 0;
 
 	function totalSets() {
 		return Math.max(1, parseInt(setInput.value, 10) || 1);
+	}
+
+	function currentWeightKg(): number | undefined {
+		const value = parseFloat(weightInput.value);
+		return value > 0 ? value : undefined;
+	}
+
+	function addElapsedSecondCalories() {
+		const weightKg = currentWeightKg();
+		if (weightKg === undefined) return;
+		const met = phase === 'bounce' ? BOUNCE_MET : phase === 'rest' ? REST_MET : 0;
+		caloriesBurned += (met * weightKg) / 3600;
+	}
+
+	function updateCaloriesDisplay() {
+		const weightKg = currentWeightKg();
+		if (weightKg === undefined) {
+			caloriesEl.textContent = '消費カロリー: 体重を入力してください';
+			return;
+		}
+		caloriesEl.textContent = `消費カロリー(推定): 約${caloriesBurned.toFixed(1)} kcal`;
+	}
+
+	function restoreProfile() {
+		try {
+			const savedHeight = localStorage.getItem('bounce-timer:height-cm');
+			const savedWeight = localStorage.getItem('bounce-timer:weight-kg');
+			if (savedHeight) heightInput.value = savedHeight;
+			if (savedWeight) weightInput.value = savedWeight;
+		} catch {
+			// localStorage unavailable; skip restoring saved profile.
+		}
+	}
+
+	function saveProfile() {
+		try {
+			localStorage.setItem('bounce-timer:height-cm', heightInput.value);
+			localStorage.setItem('bounce-timer:weight-kg', weightInput.value);
+		} catch {
+			// localStorage unavailable; skip saving profile.
+		}
 	}
 
 	function formatTime(totalSeconds: number) {
@@ -179,6 +250,7 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 		timeEl.textContent = formatTime(secondsLeft);
 		setProgressEl.textContent = `${currentSet} / ${totalSets()} セット`;
 		timerSection.classList.toggle('resting', phase === 'rest');
+		updateCaloriesDisplay();
 
 		if (phase === 'idle') {
 			phaseEl.textContent = 'スタートを押して開始';
@@ -206,6 +278,7 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 	}
 
 	function tick() {
+		addElapsedSecondCalories();
 		secondsLeft -= 1;
 
 		if (secondsLeft > 0) {
@@ -246,6 +319,8 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 		bounceInput.disabled = disabled;
 		restInput.disabled = disabled;
 		setInput.disabled = disabled;
+		heightInput.disabled = disabled;
+		weightInput.disabled = disabled;
 	}
 
 	function start() {
@@ -256,6 +331,7 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 		pauseBtn.disabled = false;
 		pauseBtn.textContent = '一時停止';
 		currentSet = 1;
+		caloriesBurned = 0;
 		startPhase('bounce');
 		intervalId = window.setInterval(tick, 1000);
 	}
@@ -274,6 +350,7 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 		clearTimer();
 		phase = 'idle';
 		currentSet = 0;
+		caloriesBurned = 0;
 		secondsLeft = parseInt(bounceInput.value, 10) || 30;
 		updateDisplay();
 		startBtn.disabled = false;
@@ -286,6 +363,12 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 	startBtn.addEventListener('click', start);
 	pauseBtn.addEventListener('click', pause);
 	resetBtn.addEventListener('click', reset);
+	heightInput.addEventListener('change', saveProfile);
+	weightInput.addEventListener('change', () => {
+		saveProfile();
+		updateCaloriesDisplay();
+	});
 
+	restoreProfile();
 	reset();
 </script>
