@@ -232,15 +232,22 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 	function beep(frequency: number, duration: number) {
 		try {
 			audioCtx ??= new AudioContext();
-			const oscillator = audioCtx.createOscillator();
-			const gain = audioCtx.createGain();
-			oscillator.frequency.value = frequency;
-			oscillator.connect(gain);
-			gain.connect(audioCtx.destination);
-			gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-			gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-			oscillator.start();
-			oscillator.stop(audioCtx.currentTime + duration);
+			const pulseCount = 3;
+			const pulseDuration = duration / pulseCount;
+			for (let i = 0; i < pulseCount; i++) {
+				const startTime = audioCtx.currentTime + i * pulseDuration;
+				const oscillator = audioCtx.createOscillator();
+				const gain = audioCtx.createGain();
+				oscillator.type = 'square';
+				oscillator.frequency.value = frequency;
+				oscillator.connect(gain);
+				gain.connect(audioCtx.destination);
+				gain.gain.setValueAtTime(0.0001, startTime);
+				gain.gain.exponentialRampToValueAtTime(0.7, startTime + 0.01);
+				gain.gain.exponentialRampToValueAtTime(0.0001, startTime + pulseDuration * 0.85);
+				oscillator.start(startTime);
+				oscillator.stop(startTime + pulseDuration);
+			}
 		} catch {
 			// Web Audio unavailable; skip sound cue.
 		}
