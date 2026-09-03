@@ -253,6 +253,20 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 		}
 	}
 
+	function speak(text: string) {
+		try {
+			if (!('speechSynthesis' in window)) return;
+			window.speechSynthesis.cancel();
+			const utterance = new SpeechSynthesisUtterance(text);
+			utterance.lang = 'ja-JP';
+			utterance.rate = 1.05;
+			utterance.pitch = 1.1;
+			window.speechSynthesis.speak(utterance);
+		} catch {
+			// Speech synthesis unavailable; skip voice cue.
+		}
+	}
+
 	function updateDisplay() {
 		timeEl.textContent = formatTime(secondsLeft);
 		setProgressEl.textContent = `${currentSet} / ${totalSets()} セット`;
@@ -281,6 +295,12 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 		phase = next;
 		secondsLeft = next === 'bounce' ? parseInt(bounceInput.value, 10) || 30 : parseInt(restInput.value, 10) || 30;
 		beep(next === 'bounce' ? 880 : 440, 0.25);
+		if (next === 'bounce') {
+			const remainingSets = totalSets() - currentSet + 1;
+			speak(`残り${remainingSets}セット、よーいスタート！`);
+		} else if (next === 'rest') {
+			speak('休憩ー！');
+		}
 		updateDisplay();
 	}
 
@@ -315,6 +335,7 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 		currentSet = totalSets();
 		secondsLeft = 0;
 		beep(660, 0.6);
+		speak('終了ー！');
 		updateDisplay();
 		startBtn.disabled = false;
 		startBtn.textContent = 'もう一度';
