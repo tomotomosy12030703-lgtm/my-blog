@@ -12,6 +12,13 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 <html lang="ja">
 	<head>
 		<BaseHead title={title} description={description} />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+		<meta name="theme-color" content="#FF4D3D" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="バウンス" />
 	</head>
 	<body>
 		<Header />
@@ -145,6 +152,19 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 	.controls button:disabled {
 		background: rgb(var(--gray));
 		cursor: not-allowed;
+	}
+</style>
+
+<style is:global>
+	/* ホーム画面から起動した際はブラウザ的なナビゲーションを隠し、アプリらしい見た目にする */
+	@media (display-mode: standalone) {
+		header,
+		footer {
+			display: none;
+		}
+		main {
+			padding-top: 2em;
+		}
 	}
 </style>
 
@@ -399,4 +419,14 @@ const description = '30秒ゆっくり弾む→30〜60秒休憩を5〜10セッ�
 
 	restoreProfile();
 	reset();
+</script>
+
+<script>
+	if ('serviceWorker' in navigator) {
+		window.addEventListener('load', () => {
+			navigator.serviceWorker.register('/sw.js').catch(() => {
+				// Service worker registration failed; app still works online.
+			});
+		});
+	}
 </script>
